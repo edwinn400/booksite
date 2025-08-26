@@ -2,22 +2,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    // Add click event listeners to all tab buttons
+    // Tab switching logic
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const targetTab = button.getAttribute('data-tab');
             
-            // Remove active class from all buttons and contents
-            tabButtons.forEach(btn => btn.classList.remove('active'));
+            // Remove active class from all tabs and buttons
             tabContents.forEach(content => content.classList.remove('active'));
+            tabButtons.forEach(btn => btn.classList.remove('active'));
             
-            // Add active class to clicked button and corresponding content
-            button.classList.add('active');
+            // Add active class to target tab and button
             document.getElementById(targetTab).classList.add('active');
+            button.classList.add('active');
             
-            // Initialize map if New Entry tab is now active
-            if (targetTab === 'new-entry') {
-                setTimeout(initializeMap, 300);
+            // Load content based on tab
+            if (targetTab === 'all-entries') {
+                loadAllEntries();
+            } else if (targetTab === 'favorites') {
+                loadFavorites();
+            } else if (targetTab === 'genre') {
+                loadGenreTab();
+            } else if (targetTab === 'world-map') {
+                // Initialize world map if not already done
+                if (!window.worldMapInitialized) {
+                    initializeWorldMap();
+                    window.worldMapInitialized = true;
+                }
+                loadBookLocations();
             }
         });
     });
@@ -283,6 +294,154 @@ document.addEventListener('DOMContentLoaded', function() {
         addAlphabetClickHandlers('favorites-alphabet', 'favorites-container');
     }
 
+    // Load and display genre distribution
+    function loadGenreTab() {
+        const entries = getAllEntries();
+        
+        if (entries.length === 0) {
+            document.getElementById('genre-summary-content').innerHTML = '<p>No books added yet. Start adding books in the New Entry tab!</p>';
+            return;
+        }
+        
+        // Count books by genre
+        const genreCounts = {};
+        const allGenres = [
+            'Classic', 'Coming of Age', 'Fantasy', 'Historic Fiction', 'Horror',
+            'Mystery', 'Nonfiction', 'Philosophy', 'Spirituality', 'Romance', 
+            'Science Fiction', 'Other Fiction'
+        ];
+        
+        // Initialize all genres with 0 count
+        allGenres.forEach(genre => {
+            genreCounts[genre] = 0;
+        });
+        
+        // Count actual genres from entries
+        entries.forEach(entry => {
+            if (entry.genres && entry.genres.length > 0) {
+                entry.genres.forEach(genre => {
+                    if (genreCounts.hasOwnProperty(genre)) {
+                        genreCounts[genre]++;
+                    }
+                });
+            }
+        });
+        
+        // Create chart data
+        const chartData = {
+            labels: allGenres,
+            datasets: [{
+                label: 'Number of Books',
+                data: allGenres.map(genre => genreCounts[genre]),
+                backgroundColor: [
+                    '#8b7355', '#a67c52', '#c19a6b', '#d4c4a8', '#8b4513',
+                    '#cd853f', '#daa520', '#b8860b', '#f4a460', '#deb887',
+                    '#f5deb3', '#f5f1e8'
+                ],
+                borderColor: '#2c3e50',
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        };
+        
+        // Create or update the chart
+        const ctx = document.getElementById('genre-chart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (window.genreChart) {
+            window.genreChart.destroy();
+        }
+        
+        window.genreChart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Books Read by Genre',
+                        color: '#2c3e50',
+                        font: {
+                            size: 18,
+                            weight: 'bold'
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#2c3e50',
+                            font: {
+                                weight: '500'
+                            }
+                        },
+                        grid: {
+                            color: '#d4c4a8'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#2c3e50',
+                            font: {
+                                weight: '500'
+                            },
+                            maxRotation: 45,
+                            minRotation: 0
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Generate summary statistics
+        generateGenreSummary(entries, genreCounts);
+    }
+
+    // Generate genre summary statistics
+    function generateGenreSummary(entries, genreCounts) {
+        const totalBooks = entries.length;
+        const booksWithGenres = entries.filter(entry => entry.genres && entry.genres.length > 0).length;
+        const booksWithoutGenres = totalBooks - booksWithGenres;
+        
+        // Find top genres
+        const sortedGenres = Object.entries(genreCounts)
+            .filter(([genre, count]) => count > 0)
+            .sort(([,a], [,b]) => b - a);
+        
+        const topGenre = sortedGenres.length > 0 ? sortedGenres[0] : null;
+        const secondGenre = sortedGenres.length > 1 ? sortedGenres[1] : null;
+        
+        let summaryHTML = `
+            <p class="total-books">Total Books: ${totalBooks}</p>
+            <p>Books with Genres: ${booksWithGenres}</p>
+            <p>Books without Genres: ${booksWithoutGenres}</p>
+        `;
+        
+        if (topGenre) {
+            summaryHTML += `<p class="top-genre">Most Read Genre: ${topGenre[0]} (${topGenre[1]} books)</p>`;
+        }
+        
+        if (secondGenre) {
+            summaryHTML += `<p>Second Most Read: ${secondGenre[0]} (${secondGenre[1]} books)</p>`;
+        }
+        
+        // Show genre diversity
+        const activeGenres = sortedGenres.length;
+        summaryHTML += `<p>Genre Diversity: ${activeGenres} different genres explored</p>`;
+        
+        document.getElementById('genre-summary-content').innerHTML = summaryHTML;
+    }
+
     // Helper function to generate alphabet sidebar
     function generateAlphabetSidebar(containerId, entries, sortType) {
         const container = document.getElementById(containerId);
@@ -536,35 +695,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // Save to localStorage
         saveEntry(entry);
         
-        // Show success message
-        successMessage.style.display = 'block';
-        
-        // Reset form
+        // Reset form and show success message
         newEntryForm.reset();
         
-        // Refresh world map if it's currently visible
-        if (worldMap) {
-            loadBookLocations();
-        }
+        // Show success message
+        const successMessage = document.createElement('div');
+        successMessage.className = 'success-message';
+        successMessage.textContent = 'Book entry saved successfully!';
+        newEntryForm.appendChild(successMessage);
         
-        // Refresh all entries if it's currently visible
-        if (document.getElementById('all-entries').classList.contains('active')) {
-            loadAllEntries();
-        }
+        // Remove success message after 3 seconds
+        setTimeout(() => {
+            successMessage.remove();
+        }, 3000);
         
-        // Refresh favorites if it's currently visible
-        if (document.getElementById('favorites').classList.contains('active')) {
-            loadFavorites();
-        }
+        // Refresh other tabs
+        loadAllEntries();
+        loadFavorites();
+        loadGenreTab();
+        loadBookLocations();
         
         // Reset time dot
         resetTimeDot();
         
-        // Hide success message after 3 seconds
-        setTimeout(() => {
-            successMessage.style.display = 'none';
-        }, 3000);
-
         const img = document.getElementById('time-scale-image');
         if (img && img.complete && img.width && img.height) {
             const dotPercent = getTimeDotPercent();
@@ -789,6 +942,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('time-scale').classList.contains('active')) {
         setTimeout(setupTimeScaleTab, 500);
     }
+
+    // Initialize first tab
+    document.getElementById('new-entry').classList.add('active');
+    document.querySelector('[data-tab="new-entry"]').classList.add('active');
+    
+    // Load initial data for other tabs
+    loadAllEntries();
+    loadFavorites();
+    loadGenreTab();
 });
 
 // Function to save entry to localStorage
@@ -915,25 +1077,20 @@ function saveEntry(entry) {
                 longitude: formData.get('longitude')
             };
 
-            // Save back to localStorage
+            // Save updated entries
             localStorage.setItem('bookEntries', JSON.stringify(entries));
-
+            
             // Close modal
             document.getElementById('edit-modal').style.display = 'none';
-
-            // Refresh current views
-            if (document.getElementById('all-entries').classList.contains('active')) {
-                loadAllEntries();
-            }
-            if (document.getElementById('favorites').classList.contains('active')) {
-                loadFavorites();
-            }
-            if (worldMap) {
-                loadBookLocations();
-            }
-
+            
+            // Refresh all tabs
+            loadAllEntries();
+            loadFavorites();
+            loadGenreTab();
+            loadBookLocations();
+            
             // Show success message
-            alert('Entry updated successfully!');
+            alert('Book entry updated successfully!');
         });
 
         // Handle delete confirmation
@@ -968,6 +1125,7 @@ function saveEntry(entry) {
             if (worldMap) {
                 loadBookLocations();
             }
+            loadGenreTab(); // Refresh genre tab
 
             // Show success message
             alert('Entry deleted successfully!');
