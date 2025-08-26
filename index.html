@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOOKSITE: The Reading Companion</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 class="main-title">BOOKSITE</h1>
+            <h2 class="subtitle">The Reading Companion</h2>
+        </header>
+        
+        <nav class="tabs">
+            <button class="tab-button active" data-tab="new-entry">New Entry</button>
+            <button class="tab-button" data-tab="all-entries">All Entries</button>
+            <button class="tab-button" data-tab="favorites">Favorites</button>
+            <button class="tab-button" data-tab="world-map">World Map</button>
+        </nav>
+        
+        <main class="content">
+            <div id="new-entry" class="tab-content active">
+                <h3>New Entry</h3>
+                <form id="new-entry-form" class="entry-form">
+                    <div class="form-group">
+                        <label for="title">Title:</label>
+                        <input type="text" id="title" name="title">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="author">Author:</label>
+                        <input type="text" id="author" name="author">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="publication-year">Publication Year:</label>
+                        <input type="number" id="publication-year" name="publication-year" min="1000" max="2024">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="year-read">Year Read:</label>
+                        <input type="number" id="year-read" name="year-read" min="1000" max="2024">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Genre:</label>
+                        <div class="genre-checkboxes">
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Classic">
+                                <span>Classic</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Coming of Age">
+                                <span>Coming of Age</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Fantasy">
+                                <span>Fantasy</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Historic Fiction">
+                                <span>Historic Fiction</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Horror">
+                                <span>Horror</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Mystery">
+                                <span>Mystery</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Nonfiction">
+                                <span>Nonfiction</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Philosophy">
+                                <span>Philosophy</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Spirituality">
+                                <span>Spirituality</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Romance">
+                                <span>Romance</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Science Fiction">
+                                <span>Science Fiction</span>
+                            </label>
+                            <label class="genre-checkbox">
+                                <input type="checkbox" name="genre" value="Other Fiction">
+                                <span>Other Fiction</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="coordinates">Author's Homeland:</label>
+                        <div class="coordinates-input">
+                            <input type="number" id="latitude" name="latitude" step="any" placeholder="Latitude (e.g., 40.7128)" min="-90" max="90">
+                            <input type="number" id="longitude" name="longitude" step="any" placeholder="Longitude (e.g., -74.0060)" min="-180" max="180">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="favorite">Favorite?</label>
+                        <select id="favorite" name="favorite">
+                            <option value="">Select...</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="thoughts">Thoughts:</label>
+                        <textarea id="thoughts" name="thoughts" rows="6" placeholder="Share your thoughts about this book..."></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">Save Entry</button>
+                        <button type="reset" class="reset-btn">Clear Form</button>
+                    </div>
+                </form>
+                
+                <div id="success-message" class="success-message" style="display: none;">
+                    <p>Entry saved successfully!</p>
+                </div>
+            </div>
+            
+            <div id="all-entries" class="tab-content">
+                <h3>All Entries</h3>
+                <div class="entries-controls">
+                    <button class="sort-btn active" data-sort="title">Sort by Title</button>
+                    <button class="sort-btn" data-sort="author">Sort by Author</button>
+                </div>
+                <div class="entries-layout">
+                    <div class="alphabet-sidebar">
+                        <div class="alphabet-title">Jump to:</div>
+                        <div class="alphabet-list" id="all-entries-alphabet">
+                            <!-- Alphabet letters will be generated here -->
+                        </div>
+                    </div>
+                    <div id="entries-container" class="entries-container">
+                        <p class="no-entries">No entries yet. Add your first book in the New Entry tab!</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="favorites" class="tab-content">
+                <h3>Favorites</h3>
+                <div class="entries-controls">
+                    <button class="sort-btn active" data-sort="title">Sort by Title</button>
+                    <button class="sort-btn" data-sort="author">Sort by Author</button>
+                </div>
+                <div class="entries-layout">
+                    <div class="alphabet-sidebar">
+                        <div class="alphabet-title">Jump to:</div>
+                        <div class="alphabet-list" id="favorites-alphabet">
+                            <!-- Alphabet letters will be generated here -->
+                        </div>
+                    </div>
+                    <div id="favorites-container" class="entries-container">
+                        <p class="no-entries">No favorite books yet. Mark some books as favorites in the New Entry tab!</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="world-map" class="tab-content">
+                <h3>World Map</h3>
+                <div id="world-map-container" class="world-map-container"></div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+    
+    <!-- Edit Entry Modal -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Book Entry</h3>
+                <button class="close-btn" id="close-edit-modal">&times;</button>
+            </div>
+            <form id="edit-entry-form" class="entry-form">
+                <input type="hidden" id="edit-entry-id" name="id">
+                
+                <div class="form-group">
+                    <label for="edit-title">Title:</label>
+                    <input type="text" id="edit-title" name="title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-author">Author:</label>
+                    <input type="text" id="edit-author" name="author" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-publication-year">Publication Year:</label>
+                    <input type="number" id="edit-publication-year" name="publication-year" min="1000" max="2024" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-year-read">Year Read:</label>
+                    <input type="number" id="edit-year-read" name="year-read" min="1000" max="2024">
+                </div>
+                
+                <div class="form-group">
+                    <label>Genre:</label>
+                    <div class="genre-checkboxes">
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Classic">
+                            <span>Classic</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Coming of Age">
+                            <span>Coming of Age</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Fantasy">
+                            <span>Fantasy</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Historic Fiction">
+                            <span>Historic Fiction</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Horror">
+                            <span>Horror</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Mystery">
+                            <span>Mystery</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Nonfiction">
+                            <span>Nonfiction</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Philosophy">
+                            <span>Philosophy</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Spirituality">
+                            <span>Spirituality</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Romance">
+                            <span>Romance</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Science Fiction">
+                            <span>Science Fiction</span>
+                        </label>
+                        <label class="genre-checkbox">
+                            <input type="checkbox" name="edit-genre" value="Other Fiction">
+                            <span>Other Fiction</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-coordinates">Author's Homeland:</label>
+                    <div class="coordinates-input">
+                        <input type="number" id="edit-latitude" name="latitude" step="any" placeholder="Latitude (e.g., 40.7128)" min="-90" max="90">
+                        <input type="number" id="edit-longitude" name="longitude" step="any" placeholder="Longitude (e.g., -74.0060)" min="-180" max="180">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-favorite">Favorite?</label>
+                    <select id="edit-favorite" name="favorite" required>
+                        <option value="">Select...</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-thoughts">Thoughts:</label>
+                    <textarea id="edit-thoughts" name="thoughts" rows="6" placeholder="Share your thoughts about this book..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn">Save Changes</button>
+                    <button type="button" class="reset-btn" id="cancel-edit">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Delete Book Entry</h3>
+                <button class="close-btn" id="close-delete-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "<span id="delete-book-title"></span>"?</p>
+                <p>This action cannot be undone.</p>
+            </div>
+            <div class="modal-actions">
+                <button class="delete-btn" id="confirm-delete">Delete</button>
+                <button class="reset-btn" id="cancel-delete">Cancel</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 
