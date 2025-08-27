@@ -103,9 +103,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    function loadAllEntries() {
+    async function loadAllEntries() {
         const entriesContainer = document.getElementById('entries-container');
-        const entries = getAllEntries();
+        const entries = await getAllEntries();
         
         if (entries.length === 0) {
             entriesContainer.innerHTML = '<p class="no-entries">No entries yet. Add your first book in the New Entry tab!</p>';
@@ -213,9 +213,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    function loadFavorites() {
+    async function loadFavorites() {
         const favoritesContainer = document.getElementById('favorites-container');
-        const allEntries = getAllEntries();
+        const allEntries = await getAllEntries();
         const favorites = allEntries.filter(entry => entry.favorite === 'yes');
         
         if (favorites.length === 0) {
@@ -295,8 +295,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Load and display genre distribution
-    function loadGenreTab() {
-        const entries = getAllEntries();
+    async function loadGenreTab() {
+        const entries = await getAllEntries();
         
         if (entries.length === 0) {
             document.getElementById('genre-summary-content').innerHTML = '<p>No books added yet. Start adding books in the New Entry tab!</p>';
@@ -666,7 +666,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Patch new entry form submission to save dot position
     const origNewEntrySubmit = newEntryForm.onsubmit;
-    newEntryForm.addEventListener('submit', function(e) {
+    newEntryForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         // Get form data
@@ -692,8 +692,8 @@ document.addEventListener('DOMContentLoaded', function() {
             longitude: formData.get('longitude')
         };
 
-        // Save to localStorage
-        saveEntry(entry);
+        // Save to cloud database
+        await saveEntry(entry);
         
         // Reset form and show success message
         newEntryForm.reset();
@@ -710,9 +710,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
         
         // Refresh other tabs
-        loadAllEntries();
-        loadFavorites();
-        loadGenreTab();
+        await loadAllEntries();
+        await loadFavorites();
+        await loadGenreTab();
         loadBookLocations();
         
         // Reset time dot
@@ -951,19 +951,186 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAllEntries();
     loadFavorites();
     loadGenreTab();
+    
+    // Migrate existing localStorage data to cloud database
+    migrateToCloud();
 });
 
-// Function to save entry to localStorage
-function saveEntry(entry) {
-    let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
-    entries.push(entry);
-    localStorage.setItem('bookEntries', JSON.stringify(entries));
+// Function to save entry to cloud database
+async function saveEntry(entry) {
+    try {
+        // First try to save to Supabase
+        const { data, error } = await supabase
+            .from('book_entries')
+            .insert([entry]);
+            
+        if (error) {
+            console.error('Error saving to cloud:', error);
+            // Fallback to localStorage if cloud save fails
+            let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+            entries.push(entry);
+            localStorage.setItem('bookEntries', JSON.stringify(entries));
+            console.log('Saved to localStorage as fallback');
+        } else {
+            console.log('Successfully saved to cloud database');
+            // Also save to localStorage as backup
+            let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+            entries.push(entry);
+            localStorage.setItem('bookEntries', JSON.stringify(entries));
+        }
+    } catch (err) {
+        console.error('Cloud save failed, using localStorage:', err);
+        // Fallback to localStorage
+        let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+        entries.push(entry);
+        localStorage.setItem('bookEntries', JSON.stringify(entries));
+    }
 }
 
-    // Function to get all entries from localStorage
-    function getAllEntries() {
+// Function to get all entries from cloud database
+async function getAllEntries() {
+    try {
+        // Try to get from Supabase first
+        const { data, error } = await supabase
+            .from('book_entries')
+            .select('*')
+            .order('title', { ascending: true });
+            
+        if (error) {
+            console.error('Error fetching from cloud:', error);
+            // Fallback to localStorage
+            return JSON.parse(localStorage.getItem('bookEntries') || '[]');
+        }
+        
+        if (data && data.length > 0) {
+            console.log('Retrieved entries from cloud database');
+            // Update localStorage with cloud data
+            localStorage.setItem('bookEntries', JSON.stringify(data));
+            return data;
+        } else {
+            // No cloud data, use localStorage
+            return JSON.parse(localStorage.getItem('bookEntries') || '[]');
+        }
+    } catch (err) {
+        console.error('Cloud fetch failed, using localStorage:', err);
         return JSON.parse(localStorage.getItem('bookEntries') || '[]');
     }
+}
+
+// Function to update entry in cloud database
+async function updateEntry(entryId, updatedEntry) {
+    try {
+        // Update in Supabase
+        const { data, error } = await supabase
+            .from('book_entries')
+            .update(updatedEntry)
+            .eq('id', entryId);
+            
+        if (error) {
+            console.error('Error updating in cloud:', error);
+            // Fallback to localStorage
+            let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+            const index = entries.findIndex(e => e.id == entryId);
+            if (index !== -1) {
+                entries[index] = { ...entries[index], ...updatedEntry };
+                localStorage.setItem('bookEntries', JSON.stringify(entries));
+            }
+        } else {
+            console.log('Successfully updated in cloud database');
+            // Also update localStorage
+            let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+            const index = entries.findIndex(e => e.id == entryId);
+            if (index !== -1) {
+                entries[index] = { ...entries[index], ...updatedEntry };
+                localStorage.setItem('bookEntries', JSON.stringify(entries));
+            }
+        }
+    } catch (err) {
+        console.error('Cloud update failed, using localStorage:', err);
+        // Fallback to localStorage
+        let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+        const index = entries.findIndex(e => e.id == entryId);
+        if (index !== -1) {
+            entries[index] = { ...entries[index], ...updatedEntry };
+            localStorage.setItem('bookEntries', JSON.stringify(entries));
+        }
+    }
+}
+
+// Function to delete entry from cloud database
+async function deleteEntryFromCloud(entryId) {
+    try {
+        // Delete from Supabase
+        const { data, error } = await supabase
+            .from('book_entries')
+            .delete()
+            .eq('id', entryId);
+            
+        if (error) {
+            console.error('Error deleting from cloud:', error);
+            // Fallback to localStorage
+            let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+            entries = entries.filter(e => e.id != entryId);
+            localStorage.setItem('bookEntries', JSON.stringify(entries));
+        } else {
+            console.log('Successfully deleted from cloud database');
+            // Also update localStorage
+            let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+            entries = entries.filter(e => e.id != entryId);
+            localStorage.setItem('bookEntries', JSON.stringify(entries));
+        }
+    } catch (err) {
+        console.error('Cloud delete failed, using localStorage:', err);
+        // Fallback to localStorage
+        let entries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+        entries = entries.filter(e => e.id != entryId);
+        localStorage.setItem('bookEntries', JSON.stringify(entries));
+    }
+}
+
+// Function to migrate existing localStorage data to cloud
+async function migrateToCloud() {
+    try {
+        const localEntries = JSON.parse(localStorage.getItem('bookEntries') || '[]');
+        if (localEntries.length === 0) {
+            console.log('No local entries to migrate');
+            return;
+        }
+        
+        console.log(`Migrating ${localEntries.length} entries to cloud...`);
+        
+        // Check if entries already exist in cloud
+        const { data: existingData, error: fetchError } = await supabase
+            .from('book_entries')
+            .select('id');
+            
+        if (fetchError) {
+            console.error('Error checking existing cloud data:', fetchError);
+            return;
+        }
+        
+        const existingIds = new Set(existingData.map(item => item.id));
+        const newEntries = localEntries.filter(entry => !existingIds.has(entry.id));
+        
+        if (newEntries.length === 0) {
+            console.log('All entries already exist in cloud');
+            return;
+        }
+        
+        // Insert new entries to cloud
+        const { data, error } = await supabase
+            .from('book_entries')
+            .insert(newEntries);
+            
+        if (error) {
+            console.error('Error migrating to cloud:', error);
+        } else {
+            console.log(`Successfully migrated ${newEntries.length} entries to cloud`);
+        }
+    } catch (err) {
+        console.error('Migration failed:', err);
+    }
+}
 
     // Edit entry functionality
     function editEntry(entryId) {
@@ -1041,7 +1208,7 @@ function saveEntry(entry) {
         });
 
         // Handle edit form submission
-        document.getElementById('edit-entry-form').addEventListener('submit', function(e) {
+        document.getElementById('edit-entry-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = new FormData(this);
@@ -1055,7 +1222,7 @@ function saveEntry(entry) {
             });
             
             // Get current entries
-            let entries = getAllEntries();
+            let entries = await getAllEntries();
             const entryIndex = entries.findIndex(e => e.id === entryId);
             
             if (entryIndex === -1) {
@@ -1064,7 +1231,7 @@ function saveEntry(entry) {
             }
 
             // Update the entry
-            entries[entryIndex] = {
+            const updatedEntry = {
                 id: entryId,
                 title: formData.get('title'),
                 author: formData.get('author'),
@@ -1077,16 +1244,16 @@ function saveEntry(entry) {
                 longitude: formData.get('longitude')
             };
 
-            // Save updated entries
-            localStorage.setItem('bookEntries', JSON.stringify(entries));
+            // Save updated entries to cloud database
+            await updateEntry(entryId, updatedEntry);
             
             // Close modal
             document.getElementById('edit-modal').style.display = 'none';
             
             // Refresh all tabs
-            loadAllEntries();
-            loadFavorites();
-            loadGenreTab();
+            await loadAllEntries();
+            await loadFavorites();
+            await loadGenreTab();
             loadBookLocations();
             
             // Show success message
@@ -1094,11 +1261,11 @@ function saveEntry(entry) {
         });
 
         // Handle delete confirmation
-        document.getElementById('confirm-delete').addEventListener('click', function() {
+        document.getElementById('confirm-delete').addEventListener('click', async function() {
             const entryId = parseInt(this.getAttribute('data-entry-id'));
             
             // Get current entries
-            let entries = getAllEntries();
+            let entries = await getAllEntries();
             const entryIndex = entries.findIndex(e => e.id === entryId);
             
             if (entryIndex === -1) {
@@ -1106,26 +1273,23 @@ function saveEntry(entry) {
                 return;
             }
 
-            // Remove the entry
-            entries.splice(entryIndex, 1);
-
-            // Save back to localStorage
-            localStorage.setItem('bookEntries', JSON.stringify(entries));
+            // Remove the entry from cloud database
+            await deleteEntryFromCloud(entryId);
 
             // Close modal
             document.getElementById('delete-modal').style.display = 'none';
 
             // Refresh current views
             if (document.getElementById('all-entries').classList.contains('active')) {
-                loadAllEntries();
+                await loadAllEntries();
             }
             if (document.getElementById('favorites').classList.contains('active')) {
-                loadFavorites();
+                await loadFavorites();
             }
             if (worldMap) {
                 loadBookLocations();
             }
-            loadGenreTab(); // Refresh genre tab
+            await loadGenreTab(); // Refresh genre tab
 
             // Show success message
             alert('Entry deleted successfully!');
